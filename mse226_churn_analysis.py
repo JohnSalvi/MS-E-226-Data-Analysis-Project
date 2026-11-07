@@ -18,36 +18,25 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve, confusion_matrix
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV, cross_validate, cross_val_predict
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_validate, cross_val_predict
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
 # ============================================================
-# 1. read csv, remove duplicates, and save the 20% holdout
+# 1. read csv and use every row as development data
 # ============================================================
 baseDir = Path(__file__).resolve().parent
 outputDir = baseDir / "mse226_results"
 outputDir.mkdir(exist_ok=True)
-data = pd.read_csv(baseDir / "Customer Churn.csv")
-data.columns = [" ".join(name.split()) for name in data.columns]
-originalRows = len(data)
-missingBefore = int(data.isna().sum().sum())
-data = data.drop_duplicates().reset_index(drop=True)
-duplicatesRemoved = originalRows - len(data)
-rowNumbers = np.arange(len(data))
-developmentRows, holdoutRows = train_test_split(
-    rowNumbers, test_size=0.20, random_state=226, stratify=data["Churn"]
-)
-np.savetxt(baseDir / "PRIVATE_holdout_indices.csv", holdoutRows, fmt="%d",
-           delimiter=",", header="rowIndex", comments="")
-development = data.iloc[developmentRows].copy().reset_index(drop=True)
+development = pd.read_csv(baseDir / "Customer Churn.csv")
+development.columns = [" ".join(name.split()) for name in development.columns]
+development = development.reset_index(drop=True)
 y = development["Churn"]
-print("Original rows:", originalRows)
-print("Duplicates removed:", duplicatesRemoved)
-print("Missing values in original CSV:", missingBefore)
-print("Development rows:", len(development), "Holdout rows:", len(holdoutRows))
-print("The holdout is not used anywhere below. Keep its index file private.")
+missingValues = int(development.isna().sum().sum())
+print("Development rows:", len(development))
+print("Missing values:", missingValues)
+print("The current CSV is the development set. This script does not split it again.")
 
 # ============================================================
 # 2. decide which columns to use
@@ -270,12 +259,9 @@ topRecall = y.iloc[topRows].sum() / y.sum()
 with open(outputDir / "run_summary.txt", "w") as file:
     file.write("MS&E 226 - Iranian customer churn, project part 1\n")
     file.write("Dataset: UCI Iranian Churn / Customer Churn.csv\n")
-    file.write("Random seed: 226; development: 80%; untouched holdout: 20%\n")
-    file.write("Original rows: " + str(originalRows) + "\n")
-    file.write("Exact duplicates removed: " + str(duplicatesRemoved) + "\n")
-    file.write("Missing original values: " + str(missingBefore) + "\n")
-    file.write("Development size: " + str(len(development)) + "\n")
-    file.write("Holdout size: " + str(len(holdoutRows)) + "\n")
+    file.write("Random seed: 226\n")
+    file.write("Missing values: " + str(missingValues) + "\n")
+    file.write("Development size: " + str(len(development)) + " (entire current CSV; no further split)\n")
     file.write("5-fold stratified CV, seed 226, identical folds for all comparisons\n")
     file.write("Primary metric: average precision (AP); secondary: ROC AUC\n")
     file.write("Selected model: " + bestName + "; feature set: " + bestFeatureName + "\n")
@@ -286,7 +272,7 @@ with open(outputDir / "run_summary.txt", "w") as file:
     file.write("Python: " + sys.version.split()[0] + "\n")
     file.write("pandas: " + pd.__version__ + "; numpy: " + np.__version__ + "\n")
     file.write("sklearn: " + sklearn.__version__ + "; matplotlib: " + matplotlib.__version__ + "\n")
-    file.write("Do not run final holdout evaluation until Project Part 2.\n")
+    file.write("The holdout was removed from this CSV and is not used here.\n")
 print("\nSelected:", bestName, "with", bestFeatureName)
 print("Recall of churners within top 20%:", round(topRecall, 4))
 print("Plots, score tables, and models saved in:", outputDir)
